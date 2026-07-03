@@ -6,7 +6,7 @@
 // @include             https://www.waze.com/editor*
 // @include             https://beta.waze.com/*
 // @exclude             https://www.waze.com/*user/*editor/*
-// @version             2.05
+// @version             2.06
 // @grant               GM_xmlhttpRequest
 // @connect             waze.com
 // @downloadURL https://update.greasyfork.org/scripts/3202/WME%20Route%20Checker.user.js
@@ -1063,6 +1063,13 @@ function initialiseRouteChecker() {
     border-bottom: silver solid 3px;
     background: #eee;
     position: relative;
+}
+
+/*To prevent FUME to conflict the instructions panel misalignment*/
+#routeTest .step {
+    clear: both !important;
+    overflow: hidden !important; /* This creates a new block formatting context to contain the internal float */
+    display: block !important;
 }
 
 /* Instruction steps */
