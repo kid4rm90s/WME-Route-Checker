@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 // globals
-var wmerc_version = "2.05";
+var wmerc_version = "2.06";
 
 var AVOID_TOLLS = 1;
 var AVOID_FREEWAYS = 2;
