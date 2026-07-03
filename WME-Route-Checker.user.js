@@ -6,7 +6,7 @@
 // @include             https://www.waze.com/editor*
 // @include             https://beta.waze.com/*
 // @exclude             https://www.waze.com/*user/*editor/*
-// @version             2.04
+// @version             2.05
 // @grant               GM_xmlhttpRequest
 // @connect             waze.com
 // @downloadURL https://update.greasyfork.org/scripts/3202/WME%20Route%20Checker.user.js
@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 // globals
-var wmerc_version = "2.04";
+var wmerc_version = "2.05";
 
 var AVOID_TOLLS = 1;
 var AVOID_FREEWAYS = 2;
@@ -139,6 +139,21 @@ function getCoords(segment) {
         "lon": seglon,
         "lat": seglat
     };
+}
+
+/**
+ * Helper function to check if the current country uses left-hand drive
+ * Uses official WME SDK API: isLeftHandTraffic attribute on Country object
+ * @returns {boolean} true if left-hand drive, false if right-hand drive
+ */
+function isLeftHandDrive() {
+    try {
+        const country = wmeSDK.DataModel.Countries.getTopCountry();
+        return country?.isLeftHandTraffic || false;
+    } catch (error) {
+        console.warn("WME Route Checker: Error checking left-hand drive:", error);
+        return false; // default to right-hand drive on error
+    }
 }
 
 function clearRoute() {
@@ -278,6 +293,8 @@ function showNavigation(nav_json, reverse) {
     instructions.innerHTML = '';
     instructions.style.display = 'block';
     instructions.style.height = document.getElementById('map').style.height;
+    instructions.style.overflowY = 'auto';
+    instructions.style.overflowX = 'hidden';
 
     var nav_coords;
     if (typeof nav_json.alternatives !== "undefined") {
@@ -393,10 +410,10 @@ function showInstructions(instructions, nav_json, r) {
     var segmentId = route.results[0].path.segmentId;
     var departFrom = 'Depart';
     if (!streetName || streetName === null) {
-        streetName = ` <span style="color: red; margin: 0; font-size: 0.7vw">${segmentId}<span>`;
+        streetName = ` <span style="color: red; margin: 0; font-size: 12px">${segmentId}<span>`;
     } else {
         departFrom = `Depart from ${streetName}`;
-        streetName = ` <span style="color: blue; margin: 0; font-size: 0.7vw; vertical-align: middle;">${streetName}<span>`
+        streetName = ` <span style="color: blue; margin: 0; font-size: 12px; vertical-align: middle;">${streetName}<span>`
         let segment = wmeSDK.DataModel.Segments.getById({
             "segmentId": segmentId
         })
@@ -419,7 +436,7 @@ function showInstructions(instructions, nav_json, r) {
     currentItem = document.createElement('a');
     currentItem.className = 'step';
     currentItem.style = "text-align: left";
-    currentItem.innerHTML = `<p style="margin: 0px 3px 0px 0px; font-size: 1.75vw; vertical-align: text-top; float: left;" class="${getTurnArrowIcon('BEGIN')}"></p> <p style="margin:0; font-size: 0.8vw">Depart from</p> ${streetName}`;
+    currentItem.innerHTML = `<p style="margin: 0px 3px 0px 0px; font-size: 16px; vertical-align: text-top; float: left;" class="${getTurnArrowIcon('BEGIN')}"></p> <p style="margin:0; font-size: 14px">Depart from</p> ${streetName}`;
     currentItem.addEventListener("click", () => {
         wmeSDK.Map.setMapCenter({
             lonLat: {
@@ -510,7 +527,7 @@ function showInstructions(instructions, nav_json, r) {
         opcode = opcode.replace(/roundabout u/, 'At the roundabout, make a U-turn');
 
         // convert keep to exit if needed
-        var keepSide = W.model.isLeftHand ? /keep left/ : /keep right/;
+        var keepSide = isLeftHandDrive() ? /keep left/ : /keep right/;
         if (opcode.match(keepSide) && i + 1 < route.results.length &&
             isKeepForExit(route.results[i].roadType, route.results[i + 1].roadType)) {
             opcode = opcode.replace(/keep (.*)/, 'exit $1');
@@ -595,7 +612,7 @@ function showInstructions(instructions, nav_json, r) {
         addlInfo += `Speed: ${(((distanceBeforeInstruction/1000) / crossTimeBeforeInstruction) * 3600).toFixed(1)}kmph / ${(((distanceBeforeInstruction/1609) / crossTimeBeforeInstruction) * 3600).toFixed(1)}mph`
         if (streetName !== '') {
             if (opcode !== 'none') {
-                streetName = ` <span style="color: blue; margin: 0; font-size: 0.7vw; vertical-align: middle;">${streetName}</span>`;
+                streetName = ` <span style="color: blue; margin: 0; font-size: 12px; vertical-align: middle;">${streetName}</span>`;
                 let segment;
                 for (let a = i+3; a > i; a--) {
                     let lookaheadResult = route.results[a];
@@ -619,7 +636,7 @@ function showInstructions(instructions, nav_json, r) {
             }
         } else {
             if (opcode != 'none') {
-                streetName = ` <span style="color: red; margin: 0; font-size: 0.7vw vertical-align: middle;">${currentResultPath.segmentId}</span>`;
+                streetName = ` <span style="color: red; margin: 0; font-size: 12px; vertical-align: middle;">${currentResultPath.segmentId}</span>`;
             }
         }
 
@@ -629,8 +646,8 @@ function showInstructions(instructions, nav_json, r) {
         }
 
         if (laneInfo != '') {
-            laneInfo = "<div style='font-family: monospace; background: black; padding: 5px; color: white; font-size: 1vw; margin: 0px 0px 3px;' align='center'>" + laneInfo + "</div>";
-        }
+            laneInfo = "<div style='font-family: monospace; background: black; padding: 5px; color: white; font-size: 25px; margin: 0px 0px 3px;' align='center'>" + laneInfo + "</div>";
+        } // lane info box which shows lanes directions and which lanes to take
 
         // display new instruction
         currentItem = document.createElement('a');
@@ -666,9 +683,9 @@ function showInstructions(instructions, nav_json, r) {
         turnInstruction = turnInstruction.replace(/exit/, 'Exit');
         turnInstruction = turnInstruction.replace(/continue/, 'Continue');
         turnInstruction = turnInstruction.replace(/arrive/, 'Arrive at');
-        let turnInstructionHTML = `<p style="margin: 0; font-size: 0.8vw;">${turnInstruction}</p>`
+        let turnInstructionHTML = `<p style="margin: 0; font-size: 14px;">${turnInstruction}</p>`
         if (opcode != 'none') {
-            currentItem.innerHTML = `${laneInfo} <p style="margin: 0px 3px 0px 0px; font-size: 1.75vw; vertical-align: text-top; float: left;" class="${turnArrowIcon}"></p> ${turnInstructionHTML} ${streetName}`;
+            currentItem.innerHTML = `${laneInfo} <p style="margin: 0px 3px 0px 0px; font-size: 40px; vertical-align: text-top; float: left;" class="${turnArrowIcon}"></p> ${turnInstructionHTML} ${streetName}`;
         } else {
             currentItem.innerHTML = laneInfo;
         }
@@ -749,7 +766,7 @@ function getLaneArrowIcon(angle) {
 function selectSegmentIDs(segments) {
     var objects = [];
     for (var i = 0; i < segments.length; i++) {
-        var segment = W.model.segments.getObjectById(segments[i]);
+        var segment = wmeSDK.DataModel.Segments.getById({ segmentId: segments[i] });
         if (segment != null) {
             objects.push(segment);
         }
@@ -815,7 +832,8 @@ function getTurnArrow(opcode, nth = 0) {
         case "EXIT_RIGHT":
             return getLaneArrow(+45);
         case "UTURN":
-            return getLaneArrow(-180);
+            // Check for left-hand drive countries (UK, Australia, Japan, etc.)
+            return isLeftHandDrive() ? getLaneArrow(180) : getLaneArrow(-180);
         case "APPROACHING_DESTINATION":
             return "\u2691"; // black flag
         case "ROUNDABOUT_LEFT":
@@ -854,7 +872,8 @@ function getTurnArrowIcon(opcode) {
         case "EXIT_RIGHT":
             return getLaneArrowIcon(+45);
         case "UTURN":
-            return getLaneArrowIcon(-180);
+            // Check for left-hand drive countries (UK, Australia, Japan, etc.)
+            return isLeftHandDrive() ? getLaneArrowIcon(180) : getLaneArrowIcon(-180);
         case "APPROACHING_DESTINATION":
             return "w-icon w-icon-flag-fill"; // black flag
         case "ROUNDABOUT_LEFT":
@@ -900,9 +919,9 @@ function isRamp(t) {
 }
 
 function isRoundabout(id) {
-    var segment = W.model.segments.getObjectById(id);
+    var segment = wmeSDK.DataModel.Segments.getById({ segmentId: id });
     if (segment != null) {
-        return segment.attributes.junctionId !== null;
+        return segment.junctionId !== null;
     }
     return false;
 }
@@ -1028,15 +1047,164 @@ function initialiseRouteChecker() {
         console.log("WME Route Checker: loaded options: " + route_options);
     }
 
-    /* dirty hack to inject stylesheet in to the DOM */
+    /* Inject comprehensive stylesheet for Route Checker */
     var style = document.createElement('style');
-    style.innerHTML = "#routeTest {padding: 0 4px 0 0; overflow-y: auto;}\n" +
-        "#routeTest p.route {margin: 0 0 0 3px; padding: 4px 8px; border-bottom: silver solid 3px; background: #eee}\n" +
-        "#routeTest a.step {display: block; margin: 0; padding: 3px 0px 0px 3px; text-decoration: none; color:black;border-bottom: silver solid 1px;}\n" +
-        "#routeTest a.step:hover {background: #ffd;}\n" +
-        "#routeTest a.step:active {background: #dfd;}\n" +
-        "#routeTest a.select {color: #00f; text-align: right}\n" +
-        "#routeTest div.routes_footer {text-align: center; margin-bottom: 25px;}\n";
+    style.innerHTML = `
+/* Main container */
+#routeTest {
+    padding: 0 4px 0 0;
+    overflow-y: auto;
+}
+
+/* Route header */
+#routeTest p.route {
+    margin: 0 0 0 3px;
+    padding: 4px 8px;
+    border-bottom: silver solid 3px;
+    background: #eee;
+    position: relative;
+}
+
+/* Instruction steps */
+#routeTest a.step {
+    display: block;
+    margin: 0;
+    padding: 3px 0px 0px 3px;
+    text-decoration: none;
+    color: black;
+    border-bottom: silver solid 1px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+#routeTest a.step:hover {
+    background: #ffd;
+}
+
+#routeTest a.step:active {
+    background: #dfd;
+}
+
+/* Select route segments link */
+#routeTest a.select {
+    color: #00f;
+    text-align: right;
+    display: block;
+}
+
+/* Footer with links */
+#routeTest div.routes_footer {
+    text-align: center;
+    margin-bottom: 25px;
+    padding: 10px 0;
+    border-top: silver solid 1px;
+    font-size: 14px;
+}
+
+/* Lane guidance display */
+#routeTest .wmerc-lane-info {
+    font-family: monospace;
+    background: black;
+    padding: 5px;
+    color: white;
+    font-size: 14px;
+    margin: 0px 0px 3px;
+    text-align: center;
+    line-height: 1.4;
+}
+
+/* Turn arrow icon */
+#routeTest .wmerc-turn-arrow {
+    margin: 0px 3px 0px 0px;
+    font-size: 16px;
+    vertical-align: text-top;
+    float: left;
+    display: inline-block;
+}
+
+/* Street name text */
+#routeTest .wmerc-street-name {
+    color: blue;
+    margin: 0;
+    font-size: 12px;
+    vertical-align: middle;
+    display: inline;
+}
+
+/* Unnamed street segment */
+#routeTest .wmerc-street-name.unnamed {
+    color: red;
+}
+
+/* Statistics text (distance, time, speed) */
+#routeTest .wmerc-stats-text {
+    margin: 0;
+    font-size: 12px;
+    color: #666;
+    font-weight: normal;
+    display: block;
+}
+
+/* Invalid roundabout exit highlighting */
+#routeTest a.step.wmerc-invalid-exit {
+    color: red;
+    font-weight: bold;
+    background-color: #ffe6e6;
+}
+
+/* Toll badge */
+#routeTest .wmerc-toll-badge {
+    float: right;
+    background: #88f;
+    color: white;
+    font-size: small;
+    padding: 2px 4px;
+    border-radius: 3px;
+    margin-right: 5px;
+}
+
+/* Street sign image */
+#routeTest .wmerc-sign-image {
+    vertical-align: middle;
+    width: 10%;
+    max-height: 30px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+/* Route options section */
+#routeOptions {
+    border-top: solid 2px #E9E9E9;
+    border-bottom: solid 2px #E9E9E9;
+    margin: 0 0 3px 5px;
+    padding: 0 0 5px;
+}
+
+#routeOptions p {
+    margin: 5px 0;
+}
+
+#routeOptions a {
+    color: #8309e1;
+    text-decoration: none;
+}
+
+#routeOptions a:hover {
+    text-decoration: underline;
+}
+
+/* Depart instruction styling */
+#routeTest .wmerc-depart-instruction {
+    font-size: 12px;
+    margin: 0;
+}
+
+/* Turn instruction label */
+#routeTest .wmerc-turn-instruction {
+    font-size: 12px;
+    margin: 0;
+}
+`;
     (document.body || document.head || document.documentElement).appendChild(style);
 
     // add a new layer for routes
